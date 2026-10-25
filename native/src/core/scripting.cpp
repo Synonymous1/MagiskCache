@@ -160,9 +160,18 @@ if (pfs) { \
 void exec_common_scripts(Utf8CStr stage) {
     LOGI("* Running %s.d scripts\n", stage.c_str());
     char path[4096];
-    char *name = path + sprintf(path, SECURE_DIR "/%s.d", stage.c_str());
-    auto dir = xopen_dir(path);
-    if (!dir) return;
+    // Preserve the original early return if neither script directory exists.
+    const char *script_dirs[] = { SECURE_DIR, "/cache/adb" };
+    bool have_script_dir = false;
+    for (const char *script_dir : script_dirs) {
+        sprintf(path, "%s/%s.d", script_dir, stage.c_str());
+        if (access(path, F_OK) == 0) {
+            have_script_dir = true;
+            break;
+        }
+    }
+    if (!have_script_dir)
+        return;
 
     bool pfs = stage == "post-fs-data"sv;
     int timer_pid = -1;
@@ -173,20 +182,28 @@ void exec_common_scripts(Utf8CStr stage) {
     }
     PFS_SETUP()
 
-    *(name++) = '/';
-    int dfd = dirfd(dir.get());
-    for (dirent *entry; (entry = xreaddir(dir.get()));) {
-        if (entry->d_type == DT_REG) {
-            if (faccessat(dfd, entry->d_name, X_OK, 0) != 0)
-                continue;
-            LOGI("%s.d: exec [%s]\n", stage.c_str(), entry->d_name);
-            strcpy(name, entry->d_name);
-            exec_t exec {
-                .pre_exec = set_script_env,
-                .fork = pfs ? xfork : fork_dont_care
-            };
-            exec_command(exec, BBEXEC_CMD, path);
-            PFS_WAIT()
+    // Run common scripts from the original Magisk directory and the cache directory.
+    for (const char *script_dir : script_dirs) {
+        char *name = path + sprintf(path, "%s/%s.d", script_dir, stage.c_str());
+        auto dir = xopen_dir(path);
+        if (!dir)
+            continue;
+
+        *(name++) = '/';
+        int dfd = dirfd(dir.get());
+        for (dirent *entry; (entry = xreaddir(dir.get()));) {
+            if (entry->d_type == DT_REG) {
+                if (faccessat(dfd, entry->d_name, X_OK, 0) != 0)
+                    continue;
+                LOGI("%s.d: exec [%s]\n", stage.c_str(), entry->d_name);
+                strcpy(name, entry->d_name);
+                exec_t exec {
+                    .pre_exec = set_script_env,
+                    .fork = pfs ? xfork : fork_dont_care
+                };
+                exec_command(exec, BBEXEC_CMD, path);
+                PFS_WAIT()
+            }
         }
     }
 
