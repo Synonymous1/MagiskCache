@@ -139,8 +139,9 @@ impl MagiskD {
         self.set_db_setting(DbEntryKey::BootloopCount, boot_cnt + 1)
             .log()
             .ok();
-        let safe_mode = boot_cnt >= 2
-            || get_prop(cstr!("persist.sys.safemode")) == "1"
+        // Automatic bootloop-count safe mode is disabled. Keep manual safe-mode
+        // triggers so scripts and modules are still skipped when safe mode is requested.
+        let safe_mode = get_prop(cstr!("persist.sys.safemode")) == "1"
             || get_prop(cstr!("ro.sys.safemode")) == "1"
             || check_key_combo();
 
