@@ -11,14 +11,15 @@ jobs:
   create-branch:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout v30.6
-        uses: actions/checkout@v6
-        with:
-          ref: ccb264f33aa245aba26a9b2508a54c40041eb46e
-          fetch-depth: 0
-          persist-credentials: false
+      - name: Check token permissions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${GITHUB_REPOSITORY}/actions/permissions/workflow
+          gh api repos/${GITHUB_REPOSITORY} \
+            --jq '.permissions'
 
-      - name: Create branch from v30.6
+      - name: Create branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
