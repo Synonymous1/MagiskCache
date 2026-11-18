@@ -1,5 +1,5 @@
-here
-name: Create clean Magisk 30.6 branch
+
+name: Manual Branch Maker
 
 'on':
   workflow_dispatch:
@@ -10,13 +10,13 @@ permissions:
 jobs:
   create-branch:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Check out Magisk v30.6
+      - name: Checkout v30.6
         uses: actions/checkout@v6
         with:
-          ref: refs/tags/v30.6
+          ref: ccb264f33aa245aba26a9b2508a54c40041eb46e
           fetch-depth: 0
 
-      - name: Create branch from v30.6
-        run: git push origin HEAD:refs/heads/magisk-30.6
+      - name: Create magisk-30.6 branch
+        run: |
+          git push origin HEAD:refs/heads/magisk-30.6
