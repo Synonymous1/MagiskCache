@@ -1,3 +1,4 @@
+
 use crate::consts::{APP_PACKAGE_NAME, BBPATH, DATABIN, MODULEROOT, SECURE_DIR};
 use crate::daemon::MagiskD;
 use crate::ffi::{
@@ -135,8 +136,10 @@ impl MagiskD {
         self.set_db_setting(DbEntryKey::BootloopCount, boot_cnt + 1)
             .log()
             .ok();
-        let safe_mode = boot_cnt >= 2
-            || get_prop(cstr!("persist.sys.safemode")) == "1"
+
+        // Automatic safe mode after repeated failed boots is disabled.
+        // Manual safe-mode triggers remain enabled.
+        let safe_mode = get_prop(cstr!("persist.sys.safemode")) == "1"
             || get_prop(cstr!("ro.sys.safemode")) == "1"
             || check_key_combo();
 
