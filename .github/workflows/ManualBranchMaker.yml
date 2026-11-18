@@ -16,7 +16,14 @@ jobs:
         with:
           ref: ccb264f33aa245aba26a9b2508a54c40041eb46e
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Create magisk-30.6 branch
+      - name: Create branch from v30.6
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git push origin HEAD:refs/heads/magisk-30.6
+          gh api \
+            --method POST \
+            repos/${GITHUB_REPOSITORY}/git/refs \
+            -f ref=refs/heads/magisk-30.6 \
+            -f sha=ccb264f33aa245aba26a9b2508a54c40041eb46e
