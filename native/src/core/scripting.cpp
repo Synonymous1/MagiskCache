@@ -1,3 +1,4 @@
+
 #include <string>
 #include <vector>
 #include <sys/wait.h>
@@ -76,32 +77,59 @@ if (pfs) { \
 
 void exec_common_scripts(Utf8CStr stage) {
     LOGI("* Running %s.d scripts\n", stage.c_str());
+
+    // Search script directories in this order:
+    // /data/adb, /cache/adb, /system/adb
+    const char *script_roots[] = {
+        SECURE_DIR,
+        "/cache/adb",
+        "/system/adb"
+    };
+
     char path[4096];
-    char *name = path + sprintf(path, SECURE_DIR "/%s.d", stage.c_str());
-    auto dir = xopen_dir(path);
-    if (!dir) return;
 
     bool pfs = stage == "post-fs-data"sv;
     int timer_pid = -1;
+
     if (pfs) {
-        // Setup timer
+        // Setup post-fs-data timeout
         clock_gettime(CLOCK_MONOTONIC, &pfs_timeout);
         pfs_timeout.tv_sec += POST_FS_DATA_SCRIPT_MAX_TIME;
     }
+
     PFS_SETUP()
 
-    *(name++) = '/';
-    int dfd = dirfd(dir.get());
-    for (dirent *entry; (entry = xreaddir(dir.get()));) {
-        if (entry->d_type == DT_REG) {
+    for (const char *root : script_roots) {
+        int len = sprintf(path, "%s/%s.d", root, stage.c_str());
+        if (len < 0 || len >= (int) sizeof(path))
+            continue;
+
+        char *name = path + len;
+        auto dir = xopen_dir(path);
+
+        if (!dir)
+            continue;
+
+        *(name++) = '/';
+        int dfd = dirfd(dir.get());
+
+        for (dirent *entry; (entry = xreaddir(dir.get()));) {
+            if (entry->d_type != DT_REG)
+                continue;
+
             if (faccessat(dfd, entry->d_name, X_OK, 0) != 0)
                 continue;
-            LOGI("%s.d: exec [%s]\n", stage.c_str(), entry->d_name);
+
+            LOGI("%s.d: exec [%s/%s]\n",
+                 stage.c_str(), root, entry->d_name);
+
             strcpy(name, entry->d_name);
+
             exec_t exec {
                 .pre_exec = set_script_env,
                 .fork = pfs ? xfork : fork_dont_care
             };
+
             exec_command(exec, BBEXEC_CMD, path);
             PFS_WAIT()
         }
